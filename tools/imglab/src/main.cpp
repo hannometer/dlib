@@ -127,6 +127,49 @@ int split_dataset (
 
 // ----------------------------------------------------------------------------------------
 
+int split_trainval_dataset (
+    const command_line_parser& parser
+)
+{
+    if (parser.number_of_arguments() != 1)
+    {
+        cerr << "The --split-trainval option requires you to give one XML file on the command line." << endl;
+        return EXIT_FAILURE;
+    }
+
+    const double split_ratio = get_option(parser, "split-trainval", 0.8);
+
+    dlib::image_dataset_metadata::dataset data, data_train, data_val;
+    load_image_dataset_metadata(data, parser[0]);
+
+    data_train.name = data.name;
+    data_train.comment = data.comment;
+    data_val.name = data.name;
+    data_val.comment = data.comment;
+
+    dlib::rand rnd;
+
+    for (unsigned long i = 0; i < data.images.size(); ++i)
+    {
+        auto&& temp = data.images[i];
+
+        double rnd_sample = rnd.get_random_double();
+
+        if (rnd_sample < split_ratio)
+            data_train.images.push_back(temp);
+        else
+            data_val.images.push_back(temp);
+    }
+
+
+    save_image_dataset_metadata(data_train, left_substr(parser[0],".") + ".train.xml");
+    save_image_dataset_metadata(data_val, left_substr(parser[0],".") + ".val.xml");
+
+    return EXIT_SUCCESS;
+}
+
+// ----------------------------------------------------------------------------------------
+
 void print_all_labels (
     const dlib::image_dataset_metadata::dataset& data
 )
@@ -614,6 +657,7 @@ int main(int argc, char** argv)
         parser.add_option("sort","Alphabetically sort the images in an XML file.");
         parser.add_option("shuffle","Randomly shuffle the order of the images listed in an XML file.");
         parser.add_option("seed", "When using --shuffle, set the random seed to the string <arg>.",1);
+        parser.add_option("split-trainval", "Split dataset into a train and a validation set",1);
         parser.add_option("split", "Split the contents of an XML file into two separate files.  One containing the "
             "images with objects labeled <arg> and another file with all the other images. ",1);
         parser.add_option("add", "Add the image metadata from <arg1> into <arg2>.  If any of the image "
@@ -730,6 +774,7 @@ int main(int argc, char** argv)
         const char* convert_args[] = {"pascal-xml","pascal-v1","idl"};
         parser.check_option_arg_range("convert", convert_args);
         parser.check_option_arg_range("cluster", 2, 999);
+        parser.check_option_arg_range("split-trainval", 0.0, 1.0);
         parser.check_option_arg_range("rotate", -360, 360);
         parser.check_option_arg_range("size", 10*10, 1000*1000);
         parser.check_option_arg_range("min-object-size", 1, 10000*10000);
@@ -1073,6 +1118,11 @@ int main(int argc, char** argv)
         if (parser.option("split"))
         {
             return split_dataset(parser);
+        }
+        
+        if (parser.option("split-trainval"))
+        {
+            return split_trainval_dataset(parser);
         }
 
         if (parser.option("shuffle"))
